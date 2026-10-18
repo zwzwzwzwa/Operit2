@@ -110,12 +110,15 @@ android {
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
-    signingConfigs {
-        create("release") {
-            storeFile = file(requiredLocalProperty("RELEASE_STORE_FILE"))
-            storePassword = requiredLocalProperty("RELEASE_STORE_PASSWORD")
-            keyAlias = requiredLocalProperty("RELEASE_KEY_ALIAS")
-            keyPassword = requiredLocalProperty("RELEASE_KEY_PASSWORD")
+    // Only configure release signing when not running debug builds
+    if (!gradle.startParameter.taskNames.any { it.contains("Debug") || it.contains("debug") }) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(requiredLocalProperty("RELEASE_STORE_FILE"))
+                storePassword = requiredLocalProperty("RELEASE_STORE_PASSWORD")
+                keyAlias = requiredLocalProperty("RELEASE_KEY_ALIAS")
+                keyPassword = requiredLocalProperty("RELEASE_KEY_PASSWORD")
+            }
         }
     }
 
