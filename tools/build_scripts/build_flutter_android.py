@@ -68,7 +68,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--enforce-lockfile", action="store_true")
     parser.add_argument("--skip-proxy-generation", action="store_true")
     parser.add_argument("--skip-signing", action="store_true")
-    parser.add_argument("--debug", action="store_true")
     parser.add_argument("--dist-dir", type=Path, default=DIST_DIR)
     return parser.parse_args()
 
@@ -103,8 +102,6 @@ def main() -> int:
     args = parse_args()
     if not args.skip_signing:
         ensure_android_signing()
-    if args.skip_signing:
-        args.debug = True
     flutter = flutter_command()
     configure_android_flutter_sdk(flutter)
     require_command("cargo")
@@ -119,7 +116,7 @@ def main() -> int:
         flutter,
         "build",
         "apk",
-        "--debug" if args.debug else "--release",
+        "--release",
         "--split-per-abi",
         "--target-platform",
         "android-arm64",
@@ -131,8 +128,7 @@ def main() -> int:
     run(command, cwd=FLUTTER_APP_DIR)
 
     apk_dir = FLUTTER_APP_DIR / "build" / "app" / "outputs" / "flutter-apk"
-    apk_name = "app-arm64-v8a-debug.apk" if args.debug else "app-arm64-v8a-release.apk"
-    apk_path = apk_dir / apk_name
+    apk_path = apk_dir / "app-arm64-v8a-release.apk"
     verify_android_runtime_assets(apk_path, "arm64-v8a")
     copy_required_file(
         apk_path,
