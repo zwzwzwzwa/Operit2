@@ -164,7 +164,10 @@ jobs:
 
       - name: Install TypeScript
         shell: pwsh
-        run: npm install -g typescript
+        run: |
+          npm install -g typescript
+          if (-not (Test-Path package.json)) { '{}' | Set-Content package.json }
+          npm install --no-save typescript
       - name: Check build environment
         shell: pwsh
         run: python tools/build_scripts/check_build_environment.py --products app --github-runner
