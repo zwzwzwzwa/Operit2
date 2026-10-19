@@ -168,6 +168,20 @@ jobs:
           npm install -g typescript
           if (-not (Test-Path package.json)) { '{}' | Set-Content package.json }
           npm install --no-save typescript
+
+      - name: Install pnpm dependencies for buildin plugins
+        shell: pwsh
+        run: |
+          corepack enable
+          Get-ChildItem -Path plugins/packages/buildin -Directory | ForEach-Object {
+            $pkg = Join-Path $_.FullName "package.json"
+            if (Test-Path $pkg) {
+              Write-Host "pnpm install in " $_.Name
+              Push-Location $_.FullName
+              pnpm install --no-frozen-lockfile
+              Pop-Location
+            }
+          }
       - name: Check build environment
         shell: pwsh
         run: python tools/build_scripts/check_build_environment.py --products app --github-runner
