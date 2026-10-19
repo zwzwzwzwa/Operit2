@@ -165,9 +165,9 @@ jobs:
       - name: Install TypeScript
         shell: pwsh
         run: |
-          npm install -g typescript
+          npm install -g typescript@5.9.2
           if (-not (Test-Path package.json)) { '{}' | Set-Content package.json }
-          npm install --no-save typescript
+          npm install --no-save typescript@5.9.2
 
       - name: Install pnpm dependencies for buildin plugins
         shell: pwsh
