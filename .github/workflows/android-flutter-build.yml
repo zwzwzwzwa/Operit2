@@ -162,6 +162,11 @@ jobs:
           RELEASE_KEY_PASSWORD=$env:ANDROID_RELEASE_KEY_PASSWORD
           "@ | Set-Content -Path (Join-Path $secretsDir "android-signing.properties") -Encoding utf8
 
+      - name: Create python venv for plugin sync
+        shell: pwsh
+        run: |
+          python -m venv .venv
+          ./.venv/Scripts/python.exe -c "import sys; print(sys.version)"
       - name: Install TypeScript
         shell: pwsh
         run: |
