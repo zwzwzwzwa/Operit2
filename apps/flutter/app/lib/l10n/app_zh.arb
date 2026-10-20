@@ -1354,6 +1354,14 @@
   "settingsAppearanceBubbleImageAdjustAi": "调整 AI 气泡图片",
   "settingsAppearanceBubbleImagePreview": "预览",
   "settingsAppearanceBubbleImagePreviewText": "这是一条气泡预览，切线展示九宫格区域",
+  "settingsAppearanceBubbleImageImportFailed": "气泡图片没有生效：{error}",
+  "@settingsAppearanceBubbleImageImportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "settingsAppearanceBubbleImageCrop": "裁切",
   "settingsAppearanceBubbleImageRepeat": "重复区域",
   "settingsAppearanceBubbleImageScale": "图片缩放",
@@ -1813,6 +1821,7 @@
   "pluginLoadingFailed": "加载失败",
   "pluginLoadingWaiting": "等待中",
   "pluginLoadingKindPackage": "包",
+  "pluginLoadingKindPlugin": "插件",
   "pluginLoadingKindMcp": "MCP",
   "pluginLoadingCompleteSuccess": "包和插件已全部加载",
   "pluginLoadingCompleteWithFailures": "部分包或插件加载失败",
@@ -1822,6 +1831,9 @@
   "chatRouteRemoteOffline": "远程{platform} 离线",
   "chatRouteLoading": "正在读取运行设备",
   "chatRouteUnknown": "运行设备状态未知",
+  "chatRouteClaimHostPrompt": "当前设备宿主未找到，是否切换为当前设备？",
+  "chatRouteClaimHostYes": "是",
+  "chatRouteClaimHostNo": "否",
   "@chatRouteRemote": {
     "placeholders": {
       "platform": {

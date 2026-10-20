@@ -57,7 +57,15 @@ class PackageManagerScreen extends StatefulWidget {
 class _PackageManagerScreenState extends State<PackageManagerScreen>
     with PageActivityMixin<PackageManagerScreen> {
   late PackageTab _selectedTab = widget.initialTab;
+  Object? _listTabToken;
+  Widget? _pluginTabWidget;
+  Widget? _packageTabWidget;
+  Object? _skillTabToken;
+  Widget? _skillTabWidget;
+  Object? _mcpTabToken;
+  Widget? _mcpTabWidget;
   bool _loading = true;
+  bool _actionsExpanded = false;
   bool _searchFiltering = false;
   String _searchInput = '';
   String _searchQuery = '';
@@ -277,7 +285,7 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
           );
         }
       }
-      ToolPkgCatalogChangeBus.notifyCatalogChanged();
+      ToolPkgCatalogChangeBus.notifyCatalogChanged(reloadPluginCode: false);
       await _loadSnapshot();
     } catch (error, stackTrace) {
       debugPrint('Failed to update plugin state: $error\n$stackTrace');
@@ -305,7 +313,7 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
       } else {
         await _packageManager.disablePackage(packageName: package.name);
       }
-      ToolPkgCatalogChangeBus.notifyCatalogChanged();
+      ToolPkgCatalogChangeBus.notifyCatalogChanged(reloadPluginCode: false);
     } catch (error, stackTrace) {
       debugPrint('Failed to update package state: $error\n$stackTrace');
       if (!mounted) {
@@ -517,59 +525,114 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
     if (_loading && _snapshot.isEmpty) {
       return const M3LoadingPane();
     }
-    return RefreshIndicator(
-      onRefresh: _loadSnapshot,
-      child: AnimatedLazyIndexedStack(
-        index: _selectedTab.index,
-        itemCount: PackageTab.values.length,
-        itemBuilder: (context, index) {
-          return switch (PackageTab.values[index]) {
-            PackageTab.plugins => PluginTabContent(
-              plugins: _filteredPlugins,
-              scopes: _scopes,
-              onMoveScope: _movePackageScope,
-              morePlugins: _filteredMorePlugins,
-              loadIssues: _filteredPluginLoadIssues,
-              enabledPluginNames: _snapshot.enabledPluginContainerNames,
-              isLoading: _loading || _searchFiltering,
-              isSearchActive: _searchQuery.trim().isNotEmpty,
-              onOpenPluginUi: _openPluginUi,
-              onPluginTap: _showPluginDetails,
-              onLoadMorePlugin: _loadBundledExternalPlugin,
-              onPluginEnabledChanged: _setPluginEnabled,
-              onPluginReordered: _searchQuery.trim().isEmpty
-                  ? _reorderPlugin
-                  : null,
-              onLoadIssueTap: _showPackageLoadIssue,
-            ),
-            PackageTab.packages => PackageTabContent(
-              packages: _filteredPackages,
-              scopes: _scopes,
-              onMoveScope: _movePackageScope,
-              enabledPackageNames: _snapshot.enabledPackageNames,
-              loadIssues: _filteredPackageLoadIssues,
-              isLoading: _loading || _searchFiltering,
-              isSearchActive: _searchQuery.trim().isNotEmpty,
-              onQuickPluginCreatorClick: _openQuickPluginCreator,
-              onPackageTap: _showPackageDetails,
-              morePackages: _filteredMorePackages,
-              onLoadMorePackage: _loadBundledExternalPackage,
-              onPackageEnabledChanged: _setPackageEnabled,
-              onLoadIssueTap: _showPackageLoadIssue,
-            ),
-            PackageTab.skills => SkillConfigScreen(
-              clients: widget.clients,
-              searchQuery: _searchQuery,
-              reloadRevision: _skillReloadRevision,
-            ),
-            PackageTab.mcp => MCPConfigScreen(
-              clients: widget.clients,
-              searchQuery: _searchQuery,
-              reloadRevision: _mcpReloadRevision,
-            ),
-          };
-        },
-      ),
+    return Stack(
+      children: <Widget>[
+        RefreshIndicator(
+          onRefresh: _loadSnapshot,
+          child: AnimatedLazyIndexedStack(
+            index: _selectedTab.index,
+            itemCount: PackageTab.values.length,
+            itemBuilder: (context, index) =>
+                _cachedTab(PackageTab.values[index]),
+          ),
+        ),
+        if (_searchFiltering || (_loading && !_snapshot.isEmpty))
+          const Positioned.fill(child: M3LoadingOverlay()),
+      ],
+    );
+  }
+
+  /// Returns the last built page when its inputs are unchanged.
+  Widget _cachedTab(PackageTab tab) {
+    switch (tab) {
+      case PackageTab.plugins:
+        _invalidateListTabsIfNeeded();
+        return _pluginTabWidget ??= _buildPluginTab();
+      case PackageTab.packages:
+        _invalidateListTabsIfNeeded();
+        return _packageTabWidget ??= _buildPackageTab();
+      case PackageTab.skills:
+        final token = Object.hash(
+          _searchQuery,
+          _skillReloadRevision,
+          identityHashCode(widget.clients),
+        );
+        if (token != _skillTabToken) {
+          _skillTabToken = token;
+          _skillTabWidget = SkillConfigScreen(
+            clients: widget.clients,
+            searchQuery: _searchQuery,
+            reloadRevision: _skillReloadRevision,
+          );
+        }
+        return _skillTabWidget!;
+      case PackageTab.mcp:
+        final token = Object.hash(
+          _searchQuery,
+          _mcpReloadRevision,
+          identityHashCode(widget.clients),
+        );
+        if (token != _mcpTabToken) {
+          _mcpTabToken = token;
+          _mcpTabWidget = MCPConfigScreen(
+            clients: widget.clients,
+            searchQuery: _searchQuery,
+            reloadRevision: _mcpReloadRevision,
+          );
+        }
+        return _mcpTabWidget!;
+    }
+  }
+
+  /// Drops retained plugin and package pages after the catalog or query changes.
+  void _invalidateListTabsIfNeeded() {
+    final token = Object.hash(
+      identityHashCode(_snapshot),
+      identityHashCode(_scopes),
+      _searchQuery,
+    );
+    if (token == _listTabToken) {
+      return;
+    }
+    _listTabToken = token;
+    _pluginTabWidget = null;
+    _packageTabWidget = null;
+  }
+
+  /// Builds the plugin page from the current filtered catalog.
+  Widget _buildPluginTab() {
+    return PluginTabContent(
+      plugins: _filteredPlugins,
+      scopes: _scopes,
+      onMoveScope: _movePackageScope,
+      morePlugins: _filteredMorePlugins,
+      loadIssues: _filteredPluginLoadIssues,
+      enabledPluginNames: _snapshot.enabledPluginContainerNames,
+      isSearchActive: _searchQuery.trim().isNotEmpty,
+      onOpenPluginUi: _openPluginUi,
+      onPluginTap: _showPluginDetails,
+      onLoadMorePlugin: _loadBundledExternalPlugin,
+      onPluginEnabledChanged: _setPluginEnabled,
+      onPluginReordered: _searchQuery.trim().isEmpty ? _reorderPlugin : null,
+      onLoadIssueTap: _showPackageLoadIssue,
+    );
+  }
+
+  /// Builds the package page from the current filtered catalog.
+  Widget _buildPackageTab() {
+    return PackageTabContent(
+      packages: _filteredPackages,
+      scopes: _scopes,
+      onMoveScope: _movePackageScope,
+      enabledPackageNames: _snapshot.enabledPackageNames,
+      loadIssues: _filteredPackageLoadIssues,
+      isSearchActive: _searchQuery.trim().isNotEmpty,
+      onQuickPluginCreatorClick: _openQuickPluginCreator,
+      onPackageTap: _showPackageDetails,
+      morePackages: _filteredMorePackages,
+      onLoadMorePackage: _loadBundledExternalPackage,
+      onPackageEnabledChanged: _setPackageEnabled,
+      onLoadIssueTap: _showPackageLoadIssue,
     );
   }
 
@@ -605,9 +668,10 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
     );
   }
 
-  /// Builds package management actions, including the shared environment editor.
+  /// Builds the expandable action button used across the package tabs.
   Widget _buildFloatingActions(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final colorScheme = Theme.of(context).colorScheme;
     final marketTab = switch (_selectedTab) {
       PackageTab.plugins => MarketHomeTab.all,
       PackageTab.packages => MarketHomeTab.all,
@@ -620,36 +684,90 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
       PackageTab.skills => '打开技能市场',
       PackageTab.mcp => '打开 MCP 市场',
     };
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        FloatingActionButton.small(
-          heroTag: null,
-          tooltip: l10n.packageConfigureEnvironmentVariables,
-          backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-          foregroundColor: Theme.of(context).colorScheme.onSecondaryContainer,
-          onPressed: () => PackageEnvironmentVariablesDialog.show(
-            context: context,
-            clients: widget.clients,
+    return TapRegion(
+      onTapOutside: (_) => _setActionsExpanded(false),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: <Widget>[
+          AnimatedSize(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.bottomRight,
+            clipBehavior: Clip.none,
+            child: _actionsExpanded
+                ? Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: <Widget>[
+                        FloatingActionButton.small(
+                          heroTag: null,
+                          tooltip: l10n.packageConfigureEnvironmentVariables,
+                          backgroundColor: colorScheme.secondaryContainer,
+                          foregroundColor: colorScheme.onSecondaryContainer,
+                          onPressed: () {
+                            _setActionsExpanded(false);
+                            PackageEnvironmentVariablesDialog.show(
+                              context: context,
+                              clients: widget.clients,
+                            );
+                          },
+                          child: const Icon(Icons.settings_outlined),
+                        ),
+                        const SizedBox(height: 12),
+                        FloatingActionButton.small(
+                          heroTag: null,
+                          tooltip: marketTooltip,
+                          backgroundColor: colorScheme.secondaryContainer,
+                          foregroundColor: colorScheme.onSecondaryContainer,
+                          onPressed: () {
+                            _setActionsExpanded(false);
+                            _openMarket(marketTab);
+                          },
+                          child: const Icon(Icons.storefront_outlined),
+                        ),
+                        const SizedBox(height: 12),
+                        FloatingActionButton.small(
+                          heroTag: null,
+                          tooltip: _addActionTooltip,
+                          backgroundColor: colorScheme.secondaryContainer,
+                          foregroundColor: colorScheme.onSecondaryContainer,
+                          onPressed: () {
+                            _setActionsExpanded(false);
+                            _handleAddAction();
+                          },
+                          child: const Icon(Icons.add),
+                        ),
+                      ],
+                    ),
+                  )
+                : const SizedBox.shrink(),
           ),
-          child: const Icon(Icons.settings_outlined),
-        ),
-        const SizedBox(height: 12),
-        FloatingActionButton(
-          heroTag: null,
-          onPressed: () => _openMarket(marketTab),
-          tooltip: marketTooltip,
-          child: const Icon(Icons.store_outlined),
-        ),
-        const SizedBox(height: 12),
-        FloatingActionButton(
-          heroTag: null,
-          onPressed: _handleAddAction,
-          tooltip: _addActionTooltip,
-          child: const Icon(Icons.add),
-        ),
-      ],
+          FloatingActionButton(
+            heroTag: null,
+            tooltip: _actionsExpanded ? '收起操作' : '更多操作',
+            onPressed: () => _setActionsExpanded(!_actionsExpanded),
+            child: AnimatedRotation(
+              turns: _actionsExpanded ? 0.25 : 0,
+              duration: const Duration(milliseconds: 180),
+              child: const Icon(Icons.more_horiz),
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  /// Updates the expanded state of the floating action menu.
+  void _setActionsExpanded(bool expanded) {
+    if (_actionsExpanded == expanded || !mounted) {
+      return;
+    }
+    setState(() {
+      _actionsExpanded = expanded;
+    });
   }
 
   String get _searchHintText {
@@ -689,8 +807,20 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
 
   List<core_proxy.ToolPkgContainerRuntime> get _filteredPlugins {
     final query = _searchQuery.trim().toLowerCase();
-    final items = _snapshot.pluginContainers.toList()
-      ..sort(_comparePluginOrder);
+    final order = <String, int>{
+      for (
+        var index = 0;
+        index < _snapshot.pluginContainerOrder.length;
+        index += 1
+      )
+        _snapshot.pluginContainerOrder[index]: index,
+    };
+    final items =
+        List<core_proxy.ToolPkgContainerRuntime>.of(_snapshot.pluginContainers)
+          ..sort(
+            (left, right) =>
+                order[left.packageName]!.compareTo(order[right.packageName]!),
+          );
     if (query.isEmpty) {
       return items;
     }
@@ -723,12 +853,38 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
     return _filterLoadIssues(items, query);
   }
 
+  /// Package names owned by a plugin container, including its subpackages.
+  Set<String> get _pluginOwnedPackageNames {
+    final names = <String>{};
+    for (final plugin in _snapshot.pluginContainers) {
+      names.add(plugin.packageName);
+      for (final subpackage in plugin.subpackages) {
+        names.add(subpackage.packageName);
+      }
+    }
+    return names;
+  }
+
   /// Identifies ToolPkg errors that belong to the plugin tab.
   bool _isPluginLoadIssue(core_proxy.ToolPkgLoadIssue issue) {
-    return switch (issue.packageKind) {
-      'toolpkg' || 'market_toolpkg' || 'bundled_toolpkg' => true,
-      _ => false,
-    };
+    switch (issue.packageKind) {
+      case 'toolpkg' || 'market_toolpkg' || 'bundled_toolpkg':
+        return true;
+    }
+    final sourceName = issue.sourcePath
+        .replaceAll('\\', '/')
+        .split('/')
+        .last
+        .toLowerCase();
+    if (sourceName.endsWith('.toolpkg')) {
+      return true;
+    }
+    final ownedByPlugins = _pluginOwnedPackageNames;
+    final packageName = issue.packageName;
+    if (packageName != null && ownedByPlugins.contains(packageName)) {
+      return true;
+    }
+    return ownedByPlugins.contains(issue.sourcePath);
   }
 
   /// Applies the common search predicate to structured load issues.
@@ -853,22 +1009,6 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
       if (!mounted) return;
       _showSnackBar('删除失败：$error');
     }
-  }
-
-  /// Compares ToolPkg containers using the persisted package-manager order.
-  int _comparePluginOrder(
-    core_proxy.ToolPkgContainerRuntime left,
-    core_proxy.ToolPkgContainerRuntime right,
-  ) {
-    final order = <String, int>{
-      for (
-        var index = 0;
-        index < _snapshot.pluginContainerOrder.length;
-        index += 1
-      )
-        _snapshot.pluginContainerOrder[index]: index,
-    };
-    return order[left.packageName]!.compareTo(order[right.packageName]!);
   }
 
   /// Moves one plugin before the selected plugin and persists the complete order.
@@ -1008,12 +1148,16 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
 
   List<core_proxy.ToolPackage> get _filteredPackages {
     final query = _searchQuery.trim().toLowerCase();
-    final items = _snapshot.availablePackages.values.toList()
-      ..sort(
-        (left, right) => toolPackageDisplayName(
-          left,
-        ).compareTo(toolPackageDisplayName(right)),
-      );
+    final ownedByPlugins = _pluginOwnedPackageNames;
+    final items =
+        _snapshot.availablePackages.values
+            .where((item) => !ownedByPlugins.contains(item.name))
+            .toList()
+          ..sort(
+            (left, right) => toolPackageDisplayName(
+              left,
+            ).compareTo(toolPackageDisplayName(right)),
+          );
     if (query.isEmpty) {
       return items;
     }

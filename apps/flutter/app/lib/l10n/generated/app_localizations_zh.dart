@@ -2751,6 +2751,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsAppearanceBubbleImagePreviewText => '这是一条气泡预览，切线展示九宫格区域';
 
   @override
+  String settingsAppearanceBubbleImageImportFailed(String error) {
+    return '气泡图片没有生效：$error';
+  }
+
+  @override
   String get settingsAppearanceBubbleImageCrop => '裁切';
 
   @override
@@ -3527,6 +3532,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pluginLoadingKindPackage => '包';
 
   @override
+  String get pluginLoadingKindPlugin => '插件';
+
+  @override
   String get pluginLoadingKindMcp => 'MCP';
 
   @override
@@ -3556,6 +3564,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatRouteUnknown => '运行设备状态未知';
+
+  @override
+  String get chatRouteClaimHostPrompt => '当前设备宿主未找到，是否切换为当前设备？';
+
+  @override
+  String get chatRouteClaimHostYes => '是';
+
+  @override
+  String get chatRouteClaimHostNo => '否';
 
   @override
   String edgePairingCodeTitle(String deviceName) {

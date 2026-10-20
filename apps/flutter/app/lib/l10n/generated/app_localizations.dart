@@ -5204,6 +5204,12 @@ abstract class AppLocalizations {
   /// **'Bubble preview with 9-slice guides'**
   String get settingsAppearanceBubbleImagePreviewText;
 
+  /// No description provided for @settingsAppearanceBubbleImageImportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Bubble image was not applied: {error}'**
+  String settingsAppearanceBubbleImageImportFailed(String error);
+
   /// No description provided for @settingsAppearanceBubbleImageCrop.
   ///
   /// In en, this message translates to:
@@ -6598,6 +6604,12 @@ abstract class AppLocalizations {
   /// **'Package'**
   String get pluginLoadingKindPackage;
 
+  /// No description provided for @pluginLoadingKindPlugin.
+  ///
+  /// In en, this message translates to:
+  /// **'Plugin'**
+  String get pluginLoadingKindPlugin;
+
   /// No description provided for @pluginLoadingKindMcp.
   ///
   /// In en, this message translates to:
@@ -6651,6 +6663,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Execution device status unknown'**
   String get chatRouteUnknown;
+
+  /// No description provided for @chatRouteClaimHostPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'The device host for this chat was not found. Switch it to this device?'**
+  String get chatRouteClaimHostPrompt;
+
+  /// No description provided for @chatRouteClaimHostYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes'**
+  String get chatRouteClaimHostYes;
+
+  /// No description provided for @chatRouteClaimHostNo.
+  ///
+  /// In en, this message translates to:
+  /// **'No'**
+  String get chatRouteClaimHostNo;
 
   /// No description provided for @edgePairingCodeTitle.
   ///

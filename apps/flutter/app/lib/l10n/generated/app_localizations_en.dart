@@ -2860,6 +2860,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Bubble preview with 9-slice guides';
 
   @override
+  String settingsAppearanceBubbleImageImportFailed(String error) {
+    return 'Bubble image was not applied: $error';
+  }
+
+  @override
   String get settingsAppearanceBubbleImageCrop => 'Crop';
 
   @override
@@ -3674,6 +3679,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pluginLoadingKindPackage => 'Package';
 
   @override
+  String get pluginLoadingKindPlugin => 'Plugin';
+
+  @override
   String get pluginLoadingKindMcp => 'MCP';
 
   @override
@@ -3704,6 +3712,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatRouteUnknown => 'Execution device status unknown';
+
+  @override
+  String get chatRouteClaimHostPrompt =>
+      'The device host for this chat was not found. Switch it to this device?';
+
+  @override
+  String get chatRouteClaimHostYes => 'Yes';
+
+  @override
+  String get chatRouteClaimHostNo => 'No';
 
   @override
   String edgePairingCodeTitle(String deviceName) {
