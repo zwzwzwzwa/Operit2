@@ -78,6 +78,7 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
   Future<void>? _snapshotLoad;
   bool _snapshotPending = false;
   Map<String, String> _scopes = {};
+  Set<String> _customizedPackageNames = <String>{};
   StreamSubscription<int>? _scopeSubscription;
 
   GeneratedApplicationPackageManagerCoreProxy get _packageManager =>
@@ -182,6 +183,7 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
         _packageManager.getBundledExternalPackageCandidates(),
         _packageManager.getBundledExternalToolPkgContainerRuntimes(),
         widget.clients.application.getExtensionScopes(kind: 'package'),
+        _packageManager.getCustomizedPackageNames(),
       ]);
       if (!_canApplySnapshot(generation)) {
         return;
@@ -209,6 +211,7 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
       final enabledPackageNameSet = enabledPackages.toSet();
       setState(() {
         _scopes = scopes;
+        _customizedPackageNames = (results[7] as List<String>).toSet();
         _snapshot = PackageManagerSnapshot(
           availablePackages: availablePackages,
           enabledPackageNames: enabledPackageNameSet,
@@ -329,12 +332,17 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
     if (!mounted) {
       return;
     }
+    final customized = _customizedPackageNames.contains(package.name);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('删除包'),
-          content: Text('确定删除 ${toolPackageDisplayName(package)}？此操作不可撤销。'),
+          title: Text(customized ? '卸载自定义' : '删除包'),
+          content: Text(
+            customized
+                ? '卸载 ${toolPackageDisplayName(package)} 的自定义版本，恢复使用内置版本。数据和配置会保留。'
+                : '确定删除 ${toolPackageDisplayName(package)}？此操作不可撤销。',
+          ),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -346,7 +354,7 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
                 backgroundColor: Theme.of(context).colorScheme.error,
                 foregroundColor: Theme.of(context).colorScheme.onError,
               ),
-              child: const Text('删除'),
+              child: Text(customized ? '卸载自定义' : '删除'),
             ),
           ],
         );
@@ -388,12 +396,17 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
     if (!mounted) {
       return;
     }
+    final customized = _customizedPackageNames.contains(plugin.packageName);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('删除插件'),
-          content: Text('确定删除 ${toolPkgContainerDisplayName(plugin)}？此操作不可撤销。'),
+          title: Text(customized ? '卸载自定义' : '删除插件'),
+          content: Text(
+            customized
+                ? '卸载 ${toolPkgContainerDisplayName(plugin)} 的自定义版本，恢复使用内置版本。数据和配置会保留。'
+                : '确定删除 ${toolPkgContainerDisplayName(plugin)}？此操作不可撤销。',
+          ),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -405,7 +418,7 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
                 backgroundColor: Theme.of(context).colorScheme.error,
                 foregroundColor: Theme.of(context).colorScheme.onError,
               ),
-              child: const Text('删除'),
+              child: Text(customized ? '卸载自定义' : '删除'),
             ),
           ],
         );
@@ -603,7 +616,10 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
   Widget _buildPluginTab() {
     return PluginTabContent(
       plugins: _filteredPlugins,
+      bundledUpdates: _bundledUpdates,
+      onUpdatePlugin: _updateBundledExternalPackage,
       scopes: _scopes,
+      customizedPackageNames: _customizedPackageNames,
       onMoveScope: _movePackageScope,
       morePlugins: _filteredMorePlugins,
       loadIssues: _filteredPluginLoadIssues,
@@ -622,7 +638,10 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
   Widget _buildPackageTab() {
     return PackageTabContent(
       packages: _filteredPackages,
+      bundledUpdates: _bundledUpdates,
+      onUpdatePackage: _updateBundledExternalPackage,
       scopes: _scopes,
+      customizedPackageNames: _customizedPackageNames,
       onMoveScope: _movePackageScope,
       enabledPackageNames: _snapshot.enabledPackageNames,
       loadIssues: _filteredPackageLoadIssues,
@@ -1052,11 +1071,24 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
     }
   }
 
+  /// Indexes bundled source updates owned by installed extensions.
+  Map<String, core_proxy.BundledExternalPackageCandidate> get _bundledUpdates =>
+      {
+        for (final candidate in _snapshot.bundledExternalCandidates)
+          if (_scopes.containsKey(candidate.packageName))
+            candidate.packageName: candidate,
+      };
+
+  /// Lists optional plugins that have no installed owner.
   List<core_proxy.BundledExternalPackageCandidate> get _filteredMorePlugins {
     final query = _searchQuery.trim().toLowerCase();
     final items =
         _snapshot.bundledExternalCandidates
-            .where((candidate) => candidate.isToolPkg)
+            .where(
+              (candidate) =>
+                  candidate.isToolPkg &&
+                  !_scopes.containsKey(candidate.packageName),
+            )
             .toList()
           ..sort(
             (left, right) => bundledExternalPackageDisplayName(
@@ -1077,11 +1109,16 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
         .toList(growable: false);
   }
 
+  /// Lists optional standalone packages that have no installed owner.
   List<core_proxy.BundledExternalPackageCandidate> get _filteredMorePackages {
     final query = _searchQuery.trim().toLowerCase();
     final items =
         _snapshot.bundledExternalCandidates
-            .where((candidate) => !candidate.isToolPkg)
+            .where(
+              (candidate) =>
+                  !candidate.isToolPkg &&
+                  !_scopes.containsKey(candidate.packageName),
+            )
             .toList()
           ..sort(
             (left, right) => bundledExternalPackageDisplayName(
@@ -1180,6 +1217,7 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
       builder: (context) {
         return PluginDetailsDialog(
           plugin: plugin,
+          isCustomized: _customizedPackageNames.contains(plugin.packageName),
           enabled: _snapshot.enabledPluginContainerNames.contains(
             plugin.packageName,
           ),
@@ -1190,26 +1228,15 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
               _openPluginUi(plugin, initialRouteId: initialRouteId);
             }
           },
-          onDeletePackage: _canDeletePlugin(plugin)
-              ? () {
-                  Navigator.of(context).pop();
-                  if (mounted) {
-                    unawaited(_deletePlugin(plugin));
-                  }
-                }
-              : null,
+          onDeletePackage: () {
+            Navigator.of(context).pop();
+            if (mounted) {
+              unawaited(_deletePlugin(plugin));
+            }
+          },
         );
       },
     );
-  }
-
-  /// Returns whether the plugin source can be removed from package storage.
-  bool _canDeletePlugin(core_proxy.ToolPkgContainerRuntime plugin) {
-    return switch (plugin.sourceType) {
-      core_proxy.ToolPkgSourceType.asset => false,
-      core_proxy.ToolPkgSourceType.market ||
-      core_proxy.ToolPkgSourceType.externalValue => true,
-    };
   }
 
   /// Moves an installed package with its configuration and refreshes all rows.
@@ -1230,6 +1257,21 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
       ).showSnackBar(SnackBar(content: Text(error.toString())));
       await _loadSnapshot();
     }
+  }
+
+  /// Replaces an installed bundled source while retaining its scope and settings.
+  Future<void> _updateBundledExternalPackage(
+    core_proxy.BundledExternalPackageCandidate candidate,
+  ) async {
+    await _runAddAction(
+      () => candidate.isToolPkg
+          ? _packageManager.importBundledExternalToolPkgContainer(
+              containerPackageName: candidate.packageName,
+            )
+          : _packageManager.importBundledExternalPackage(
+              packageName: candidate.packageName,
+            ),
+    );
   }
 
   /// Imports one bundled external ToolPkg container from runtime assets.
@@ -1309,6 +1351,7 @@ class _PackageManagerScreenState extends State<PackageManagerScreen>
       builder: (context) {
         return PackageDetailsDialog(
           package: package,
+          isCustomized: _customizedPackageNames.contains(package.name),
           onDeletePackage: () {
             Navigator.of(context).pop();
             if (mounted) {

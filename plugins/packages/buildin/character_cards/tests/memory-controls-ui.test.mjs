@@ -254,9 +254,17 @@ test("real main IPC and local HTTP provider: saved embedding configuration sends
   await dialog.getByLabel("向量权重", { exact: true }).fill("1");
   await dialog.getByLabel("检索查询", { exact: true }).fill("Real provider query");
   await dialog.getByRole("button", { name: "使用当前权重检索", exact: true }).click();
-  assert.equal(received.length, 2); assert.deepEqual(received[1].body, { input: "Real provider query", model: "actual-local-model", encoding_format: "float" });
+  assert.equal(received.length, 4);
+  assert.deepEqual(received.slice(1).map(
+    /** Requires each explicit query term rather than the removed whole-query vector path. */
+    request => request.body,
+  ), ["Real", "provider", "query"].map(
+    /** Preserves the configured model and actual provider request encoding. */
+    input => ({ input, model: "actual-local-model", encoding_format: "float" }),
+  ));
   const debug = plain(await ui.runtime.web({ action: "searchMemoryDebug", ownerKey: CONTROLLED_OWNER, query: "Real provider query", config: { scoreMode: "BALANCED", keywordWeight: 0, tagWeight: 0, vectorWeight: 1, edgeWeight: 0 }, relevanceThreshold: 0 }));
-  assert.ok(debug.candidates[0].vectorScore > 0.999); assert.ok(debug.candidates[0].passedThreshold);
+  assert.ok(Math.abs(debug.candidates[0].vectorScore - Math.sqrt(3) * (1 + Math.sqrt(0.5) / 61)) < 1e-12);
+  assert.equal(received.length, 4, "Repeated per-term search must reuse the persisted cache"); assert.ok(debug.candidates[0].passedThreshold);
   assert.equal((await ui.runtime.web({ action: "readMemorySearchConfig", ownerKey: CONTROLLED_OWNER })).vectorWeight, 0);
   const cached = (await storedOwner(ui.harness)).embeddings;
   fail = true; await dialog.getByRole("button", { name: "重建 Embedding", exact: true }).click();
@@ -416,6 +424,7 @@ test("graph canonical relationship editing and full memory backup import/export 
   await editor.getByRole("button", { name: "保存", exact: true }).click();
   assert.equal((await storedOwner(ui.harness)).links[0].type_, "canonical-edited");
   assert.equal((await storedOwner(ui.harness)).links[0].description, link.description);
+  await graph.getByRole("button", { name: "更多操作", exact: true }).click();
   await graph.getByRole("button", { name: "导出记忆 JSON", exact: true }).click();
   const exported = ui.page.getByRole("dialog", { name: "导出 JSON", exact: true });
   const content = await exported.getByLabel("JSON 内容").inputValue(), backup = JSON.parse(content);
@@ -435,6 +444,7 @@ test("graph canonical relationship editing and full memory backup import/export 
   await ui.page.evaluate(() => { window.rejectExport = false; });
   await exported.getByRole("button", { name: "保存文件", exact: true }).click();
   assert.equal((await ui.harness.disk.readBytes(path)).toString("utf8"), content);
+  await graph.getByRole("button", { name: "更多操作", exact: true }).click();
   await graph.getByRole("button", { name: "导入记忆 JSON", exact: true }).click();
   const imported = ui.page.getByRole("dialog", { name: "导入记忆 JSON", exact: true });
   await imported.getByLabel("相同 UUID 记忆处理", { exact: true }).selectOption("UPDATE");
